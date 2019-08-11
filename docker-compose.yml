@@ -1,0 +1,19 @@
+version: '3'
+services:
+  node:
+    container_name: cdk_node
+    build:
+      context: ./docker/node
+    volumes:
+      - './:/usr/app'
+    working_dir: '/usr/app'
+    command: ["/bin/sh", "-c", "tail -f /dev/null"]
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - ROLE_ARN=${ROLE_ARN}
+      - MFA_DEVICE=${MFA_DEVICE}
+      - AWS_REGION=${AWS_REGION}

@@ -1,0 +1,208 @@
+{
+  "Parameters": {
+    "EngineVersion": {
+      "Type": "String",
+      "Default": "10.7"
+    },
+    "EngineFamily": {
+      "Type": "String",
+      "Default": "aurora-postgresql10"
+    },
+    "Port": {
+      "Type": "Number",
+      "Default": 5432
+    }
+  },
+  "Resources": {
+    "DBCluster": {
+      "Type": "AWS::RDS::DBCluster",
+      "Properties": {
+        "Engine": "aurora-postgresql",
+        "EngineMode": "provisioned",
+        "EngineVersion": {
+          "Ref": "EngineVersion"
+        },
+        "DatabaseName": {
+          "Ref": "DatabaseName"
+        },
+        "MasterUsername": {
+          "Fn::Sub": [
+            "{{resolve:secretsmanager:${DbSecretArn}:SecretString:username}}",
+            {
+              "DbSecretArn": {
+                "Fn::ImportValue": {
+                  "Ref": "DbSecretArnExpressName"
+                }
+              }
+            }
+          ]
+        },
+        "MasterUserPassword": {
+          "Fn::Sub": [
+            "{{resolve:secretsmanager:${DbSecretArn}:SecretString:password}}",
+            {
+              "DbSecretArn": {
+                "Fn::ImportValue": {
+                  "Ref": "DbSecretArnExpressName"
+                }
+              }
+            }
+          ]
+        },
+        "DBClusterParameterGroupName": {
+          "Ref": "DBClusterParameterGroup"
+        },
+        "DBSubnetGroupName": {
+          "Ref": "DBSubnetGroup"
+        },
+        "Port": {
+          "Ref": "Port"
+        },
+        "VpcSecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "ClusterSecurityGroup",
+              "GroupId"
+            ]
+          }
+        ],
+        "DeletionProtection": false
+      }
+    },
+    "RDSDBFirstInstance": {
+      "Type": "AWS::RDS::DBInstance",
+      "Properties": {
+        "DBInstanceClass": {
+          "Ref": "DBInstanceClass"
+        },
+        "DBClusterIdentifier": {
+          "Ref": "DBCluster"
+        },
+        "Engine": "aurora-postgresql",
+        "EngineVersion": {
+          "Ref": "EngineVersion"
+        },
+        "DBParameterGroupName": {
+          "Ref": "DBInstanceParamGroup"
+        },
+        "DBSubnetGroupName": {
+          "Ref": "DBSubnetGroup"
+        },
+        "PubliclyAccessible": false
+      }
+    },
+    "DBClusterParameterGroup": {
+      "Type": "AWS::RDS::DBClusterParameterGroup",
+      "Properties": {
+        "Description": {
+          "Fn::Sub": "${StackDescription} Database Cluster Parameter Group"
+        },
+        "Family": {
+          "Ref": "EngineFamily"
+        },
+        "Parameters": {
+          "rds.force_ssl": 1
+        }
+      }
+    },
+    "DBInstanceParamGroup": {
+      "Type": "AWS::RDS::DBParameterGroup",
+      "Properties": {
+        "Description": {
+          "Fn::Sub": "${StackDescription} Database Instance Parameter Group"
+        },
+        "Family": {
+          "Ref": "EngineFamily"
+        }
+      }
+    },
+    "DBSubnetGroup": {
+      "Type": "AWS::RDS::DBSubnetGroup",
+      "Properties": {
+        "DBSubnetGroupDescription": {
+          "Fn::Sub": "${StackDescription} Subnet Group"
+        },
+        "SubnetIds": {
+          "Fn::Split": [
+            ",",
+            {
+              "Fn::ImportValue": {
+                "Ref": "SubnetIdsExportName"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "ClusterSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": {
+          "Fn::Sub": "${StackDescription} Aurora RDS Security Group"
+        },
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "FromPort": "-1",
+            "IpProtocol": "-1",
+            "ToPort": "-1"
+          }
+        ],
+        "SecurityGroupIngress": [
+          {
+            "SourceSecurityGroupId": {
+              "Fn::ImportValue": {
+                "Ref": "SourceSecurityGroupIdExportName"
+              }
+            },
+            "FromPort": {
+              "Ref": "Port"
+            },
+            "IpProtocol": "tcp",
+            "ToPort": {
+              "Ref": "Port"
+            }
+          }
+        ],
+        "VpcId": {
+          "Fn::ImportValue": {
+            "Ref": "VpcIdExportName"
+          }
+        }
+      }
+    },
+    "DBClusterSecretAttachment": {
+      "Type": "AWS::SecretsManager::SecretTargetAttachment",
+      "Properties": {
+        "SecretId": {
+          "Fn::ImportValue": {
+            "Ref": "DbSecretArnExpressName"
+          }
+        },
+        "TargetId": {
+          "Ref": "DBCluster"
+        },
+        "TargetType": "AWS::RDS::DBCluster"
+      }
+    }
+  },
+  "Outputs": {
+    "DBCluster": {
+      "Description": "Aurora Database Cluster Endpoint",
+      "Value": {
+        "Fn::GetAtt": [
+          "DBCluster",
+          "Endpoint.Address"
+        ]
+      },
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-DBCluster"
+        }
+      }
+    }
+  }
+}
+
+
+
